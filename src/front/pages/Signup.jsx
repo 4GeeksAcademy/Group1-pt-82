@@ -24,7 +24,7 @@ export const Signup = () => {
         body: JSON.stringify({
           email,
           password,
-          favorite_pet: pet // Add this to match your backend
+          security_question: pet // Add this to match your backend
         })
       });
 

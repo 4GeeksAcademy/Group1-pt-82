@@ -7,7 +7,8 @@ export const Account = () => {
         (typeof useGlobalReducer === "function" ? useGlobalReducer() : { store: {} }) ||
         { store: {} };
 
-    const token = store?.session?.token ?? null;
+    // const token = store?.session?.token ?? null;
+    const token = true;
     const firstName = store?.user?.first_name ?? "Guest";
 
     // Placeholder listing (replace with API/store data when available)
