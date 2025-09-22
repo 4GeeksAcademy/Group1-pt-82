@@ -127,7 +127,7 @@ export const Login = () => {
                           </label>
                         </div>
                         <Link to="/forgot-password" className="small">
-                          Forgot password?
+                          Forgot password
                         </Link>
                       </div>
                       <button className="btn btn-primary w-100" type="submit" disabled={busy}>
