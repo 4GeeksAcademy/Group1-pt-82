@@ -1,14 +1,14 @@
 // src/front/pages/Account.jsx
 import React, { useState } from "react";
-import useGlobalReducer from "../hooks/useGlobalReducer.jsx";
+import { Navigate } from "react-router-dom";
+import useGlobalReducer from "../hooks/useGlobalReducer";
 
 export const Account = () => {
-    const { store } =
-        (typeof useGlobalReducer === "function" ? useGlobalReducer() : { store: {} }) ||
-        { store: {} };
+    const { store } = useGlobalReducer();
+    const { session } = store;
 
-    const token = store?.session?.token ?? null;
-    const firstName = store?.user?.first_name ?? "Guest";
+    const token = session?.token ?? null;
+    const firstName = session?.user?.first_name ?? "Guest";
 
     // Placeholder listing (replace with API/store data when available)
     const listing = store?.listing ?? {
@@ -24,17 +24,7 @@ export const Account = () => {
 
     // Guard: no token means show login redirect UI
     if (!token) {
-        return (
-            <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
-                <div className="text-center p-4">
-                    <h1 className="h4 mb-2">Not authorized</h1>
-                    <p className="text-muted mb-3">Please log in to view your account.</p>
-                    <a className="btn btn-primary" href="/login">
-                        Go to Login
-                    </a>
-                </div>
-            </div>
-        );
+        return <Navigate to="/login" />;
     }
 
     return (
