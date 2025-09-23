@@ -1,25 +1,16 @@
-"""
-API routes: auth, calendar (ICS) fetch, DB sync, and admin updates.
-
-Environment (optional):
-- RESERVATIONS_ICS_URL: ICS feed for your Airbnb→Google calendar.
-- RESERVATIONS_LISTING_ID: default listing id for syncs (int).
-"""
-
 from __future__ import annotations
 
 import os
 import re
-from datetime import datetime, date, timedelta, timezone
-from zoneinfo import ZoneInfo
-from typing import List, Dict, Any
-
+import pytz
 import requests
-from icalendar import Calendar
-from flask import Blueprint, request, jsonify
+from datetime import datetime, date, timedelta, timezone
+from typing import List, Dict, Any
+from flask import Blueprint, current_app, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
 from sqlalchemy import select
+from icalendar import Calendar
 
 from api.models import db, User, Listing, Booking
 
@@ -29,7 +20,6 @@ CORS(api, supports_credentials=True, origins="*")
 # -----------------------------
 # Auth endpoints (simple demo)
 # -----------------------------
-
 
 @api.route("/token", methods=["POST"])
 def create_token():
@@ -57,9 +47,7 @@ def reset_password():
     if not user:
         return jsonify({"error": "user_not_found"}), 404
 
-    
     user.password = generate_password_hash(new_password)     
-    
     db.session.commit()
     return jsonify({"ok": True}), 200
 
@@ -78,7 +66,6 @@ def signup():
     db.session.commit()
     return jsonify({"msg": "User created successfully"}), 201
 
-
 @api.route("/login", methods=["POST"])
 def login():
     email = request.json.get("email")
@@ -89,7 +76,6 @@ def login():
     access_token = create_access_token(identity=user.id)
     return jsonify({"token": access_token, "user_id": user.id})
 
-
 @api.route("/account", methods=["GET"])
 @jwt_required()
 def protect_account():
@@ -97,14 +83,12 @@ def protect_account():
     user = User.query.get(current_user_id)
     return jsonify({"id": user.id, "email": user.email}), 200
 
-
 @api.route("/preview", methods=["GET"])
 @jwt_required()
 def protect_preview():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     return jsonify({"id": user.id, "email": user.email}), 200
-
 
 @api.route("/admin/users", methods=["GET"])
 def list_all_users():
@@ -118,115 +102,156 @@ def list_all_users():
         "users": [user.serialize() for user in users]
     }), 200
 
-
 @api.route("/hello", methods=["GET"])
 def handle_hello():
     return jsonify({
         "message": "Hello! I'm a message that came from the backend. Check the network tab."
     }), 200
 
-# -----------------------------------------
-# Calendar (ICS) parsing + JSON exposure
-# -----------------------------------------
+# -----------------------------
+# Calendar (ICS) parsing + JSON exposure (Jose2 ENHANCED)
+# -----------------------------
 
+def _env(name: str, default: str | None = None) -> str | None:
+    return os.environ.get(name, default)
 
-ICS_URL = os.getenv(
-    "RESERVATIONS_ICS_URL",
-    # Fallback to your provided calendar ID
+RESERVATIONS_ICS_URL = _env("RESERVATIONS_ICS_URL") or (
     "https://calendar.google.com/calendar/ical/"
     "r2jpg8uh13234dsjiducroruahlv7i2r%40import.calendar.google.com/public/basic.ics"
 )
+DEFAULT_TZ = _env("DEFAULT_TIMEZONE", "America/New_York")
 
-RE_URL = re.compile(r"Reservation URL:\s*(\S+)", re.I)
-RE_LAST4 = re.compile(r"Phone Number.*?:\s*(\d{4})", re.I)
+# --- URL helpers -------------------------------------------------------------
+RE_URL = re.compile(r"(https?://[^\s)]+)", re.I)
+RE_EXT_IMAGE = re.compile(r"\.(?:png|jpe?g|webp|gif)(?:\?.*)?$", re.I)
+RE_DRIVE_FILE_VIEW = re.compile(r"https?://drive\.google\.com/file/d/([^/]+)/view(?:\?[^ ]*)?", re.I)
+RE_DRIVE_OPEN = re.compile(r"https?://drive\.google\.com/open\?id=([^&]+)", re.I)
+RE_DRIVE_UC = re.compile(r"https?://drive\.google\.com/uc\?(?:export=\w+&)?id=([^&]+)", re.I)
 
+def to_direct_image_url(url: str) -> str:
+    """
+    Convert known providers (Google Drive) to a direct image URL.
+    If it already looks like an image or a direct-drive link, return as-is/converted.
+    """
+    if not url:
+        return url
 
-def _to_local_date(dt_obj, tz: ZoneInfo) -> date:
-    """Normalize a datetime/date from ICS to local date in tz."""
-    if isinstance(dt_obj, datetime):
-        if dt_obj.tzinfo is None:
-            dt_obj = dt_obj.replace(tzinfo=timezone.utc)
-        return dt_obj.astimezone(tz).date()
-    return dt_obj  # already a date
+    # Google Drive conversions
+    m = RE_DRIVE_FILE_VIEW.search(url) or RE_DRIVE_OPEN.search(url) or RE_DRIVE_UC.search(url)
+    if m:
+        file_id = m.group(1)
+        return f"https://drive.google.com/uc?export=view&id={file_id}"
 
+    # Otherwise, if it looks like a normal image (by extension), return as is
+    if RE_EXT_IMAGE.search(url):
+        return url
 
-def _fetch_reserved_rows(tz_name: str = "America/New_York") -> List[Dict[str, Any]]:
-    """Fetch 'Reserved' events from ICS and return rows with dates + extras."""
-    tz = ZoneInfo(tz_name)
-    resp = requests.get(ICS_URL, timeout=30)
+    # Fallback: return original (may still work if server responds with image content-type)
+    return url
+
+# --- Datetime helpers --------------------------------------------------------
+
+def _to_tz(dt, tzname: str):
+    tz = pytz.timezone(tzname)
+    if isinstance(dt, datetime):
+        if dt.tzinfo is None:
+            return tz.localize(dt)
+        return dt.astimezone(tz)
+    return tz.localize(datetime(dt.year, dt.month, dt.day, 0, 0, 0))
+
+def _fix_all_day_checkout(start, end):
+    if isinstance(start, datetime) or isinstance(end, datetime):
+        return end
+    return end - timedelta(days=1)
+
+# --- Image extraction --------------------------------------------------------
+
+def _first_image_from_vevent(vevent) -> str | None:
+    """
+    Extract an image URL from an event via:
+      1) ATTACH property (may be one or many)
+      2) Any URL in DESCRIPTION (first match)
+    For Google Drive links, convert to a direct-view URL.
+    """
+    # 1) ATTACH
+    attach = vevent.get("attach")
+    if attach:
+        cands = attach if isinstance(attach, list) else [attach]
+        for a in cands:
+            url = to_direct_image_url(str(a))
+            if url:
+                return url
+
+    # 2) DESCRIPTION scan for any URL
+    desc = str(vevent.get("description") or "")
+    m = RE_URL.search(desc)
+    if m:
+        return to_direct_image_url(m.group(1))
+
+    return None
+
+# --- Core ICS parsing --------------------------------------------------------
+
+def _fetch_reserved_rows(tzname: str = DEFAULT_TZ) -> List[Dict[str, Any]]:
+    if not RESERVATIONS_ICS_URL:
+        raise RuntimeError("RESERVATIONS_ICS_URL is not configured")
+
+    resp = requests.get(RESERVATIONS_ICS_URL, timeout=30)
     resp.raise_for_status()
     cal = Calendar.from_ical(resp.content)
 
     rows: List[Dict[str, Any]] = []
-
     for vevent in cal.walk("vevent"):
         summary = str(vevent.get("summary") or "")
         if "reserved" not in summary.lower():
             continue
 
         uid = str(vevent.get("uid") or "").strip()
-        dtstart = vevent.get("dtstart")
-        dtend = vevent.get("dtend")
+        if not uid:
+            continue
+
+        dtstart = vevent.get("dtstart") and vevent.get("dtstart").dt
+        dtend = vevent.get("dtend") and vevent.get("dtend").dt
         if not dtstart or not dtend:
             continue
 
-        s_raw = dtstart.dt
-        e_raw = dtend.dt
+        start_local = _to_tz(dtstart, tzname)
+        end_local = _to_tz(dtend, tzname)
 
-        # All-day if both are date objects (not datetimes)
-        is_all_day = (
-            isinstance(s_raw, date) and not isinstance(s_raw, datetime)
-            and isinstance(e_raw, date) and not isinstance(e_raw, datetime)
-        )
+        checkout_display = end_local
+        if not isinstance(dtstart, datetime) and not isinstance(dtend, datetime):
+            checkout_display = _to_tz(_fix_all_day_checkout(dtstart, dtend), tzname)
 
-        checkin = _to_local_date(s_raw, tz)
-        checkout = _to_local_date(e_raw, tz)
-        if is_all_day:
-            # ICS all-day DTEND is EXCLUSIVE → subtract 1 day
-            checkout = checkout - timedelta(days=1)
-
-        # Parse description for extra details
         desc = str(vevent.get("description") or "")
         m_url = RE_URL.search(desc)
-        m_last4 = RE_LAST4.search(desc)
+        reservation_url = m_url.group(1) if m_url else None
+
+        image_url = _first_image_from_vevent(vevent)
 
         rows.append({
-            "uid": uid,
-            "checkin": checkin.isoformat(),
-            "checkout": checkout.isoformat(),
-            "reservation_url": m_url.group(1) if m_url else None,
-            "phone_last4": m_last4.group(1) if m_last4 else None,
+            "event": uid,
+            "title": summary.strip(),
+            "checkin": start_local.isoformat(),
+            "checkout": checkout_display.isoformat(),
+            "reservation_url": reservation_url,
+            "image": image_url,
         })
-
-    rows.sort(key=lambda r: (r["checkin"], r["checkout"]))
+    rows.sort(key=lambda x: x["checkin"])
     return rows
-
 
 @api.route("/calendar/reserved", methods=["GET"])
 def calendar_reserved():
-    """
-    Returns JSON [{uid, checkin, checkout, reservation_url, phone_last4}]
-    Optional query: ?start=YYYY-MM-DD&end=YYYY-MM-DD&tz=America/New_York
-    """
-    tz = request.args.get("tz", "America/New_York")
-    qstart = request.args.get("start")
-    qend = request.args.get("end")
-
-    rows = _fetch_reserved_rows(tz_name=tz)
-
-    if qstart:
-        s = date.fromisoformat(qstart)
-        rows = [r for r in rows if date.fromisoformat(r["checkout"]) >= s]
-    if qend:
-        e = date.fromisoformat(qend)
-        rows = [r for r in rows if date.fromisoformat(r["checkin"]) <= e]
-
-    return jsonify(rows), 200
+    tzname = request.args.get("tz") or DEFAULT_TZ
+    try:
+        rows = _fetch_reserved_rows(tzname)
+        return jsonify(rows), 200
+    except Exception as e:
+        current_app.logger.exception("calendar_reserved failed: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 # ------------------------------------------------
 # Admin: sync ICS rows into DB as Booking records
 # ------------------------------------------------
-
 
 @api.route("/admin/sync-reserved", methods=["POST"])
 def sync_reserved_to_db():
@@ -239,8 +264,7 @@ def sync_reserved_to_db():
     if request.is_json:
         listing_id = request.json.get("listing_id")
     if not listing_id:
-        listing_id = request.args.get(
-            "listing_id") or os.getenv("RESERVATIONS_LISTING_ID")
+        listing_id = request.args.get("listing_id") or os.getenv("RESERVATIONS_LISTING_ID")
 
     if not listing_id:
         return jsonify({"error": "listing_id required"}), 400
@@ -258,9 +282,9 @@ def sync_reserved_to_db():
     created = updated = 0
 
     for r in rows:
-        uid = r["uid"]
-        ci = date.fromisoformat(r["checkin"])
-        co = date.fromisoformat(r["checkout"])
+        uid = r["event"]
+        ci = date.fromisoformat(r["checkin"][:10])
+        co = date.fromisoformat(r["checkout"][:10])
 
         booking = db.session.execute(
             select(Booking).where(
@@ -284,6 +308,7 @@ def sync_reserved_to_db():
         booking.airbnb_checkout = co
         booking.reservation_url = r.get("reservation_url")
         booking.phone_last4 = r.get("phone_last4")
+        booking.airbnb_guestpic_url = r.get("image")
 
     db.session.commit()
     return jsonify({"ok": True, "created": created, "updated": updated}), 200
@@ -291,7 +316,6 @@ def sync_reserved_to_db():
 # ------------------------------------------------
 # Admin: manually punch guest names and profile pic
 # ------------------------------------------------
-
 
 @api.route("/admin/bookings/<int:booking_id>", methods=["PATCH"])
 def admin_update_booking(booking_id: int):
@@ -325,7 +349,6 @@ def admin_update_booking(booking_id: int):
 # Public bookings read API
 # -----------------------------
 
-
 @api.route("/bookings", methods=["GET"])
 def list_bookings():
     """
@@ -353,10 +376,10 @@ def list_bookings():
 
     items = db.session.execute(q).scalars().all()
     return jsonify([b.serialize() for b in items]), 200
+
 # -----------------------------
 # Restaurant endpoints
 # -----------------------------
-
 
 @api.route("/restaurants/nearby", methods=["GET"])
 def get_nearby_restaurants():
