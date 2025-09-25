@@ -3,7 +3,7 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import useGlobalReducer from "../hooks/useGlobalReducer";
 
 async function apiLogin({ email, password }) {
-  const res = await fetch("/api/login", {
+  const res = await fetch("https://glorious-space-halibut-r49v46gv46qfx5qw-3001.app.github.dev/api/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password })
