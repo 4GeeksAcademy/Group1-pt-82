@@ -3,6 +3,7 @@ This module takes care of starting the API Server, Loading the DB and Adding the
 """
 import os
 from flask import Flask, request, jsonify, url_for, send_from_directory
+from flask_cors import CORS  # Add this import
 from flask_migrate import Migrate
 from flask_swagger import swagger
 from api.utils import APIException, generate_sitemap
@@ -22,6 +23,10 @@ app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = "super-secret"
 jwt = JWTManager(app)
 app.url_map.strict_slashes = False
+
+# Enable CORS for your frontend URL
+CORS(app, origins=[
+     "https://glorious-space-halibut-r49v46gv46qfx5qw-3000.app.github.dev"])
 
 # database configuration
 db_url = os.getenv("DATABASE_URL")
