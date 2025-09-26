@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import re
-import pytz
 import requests
 from datetime import datetime, date, timedelta, timezone
 from typing import List, Dict, Any
@@ -151,8 +150,7 @@ def to_direct_image_url(url: str) -> str:
 
 # --- Datetime helpers --------------------------------------------------------
 
-def _to_tz(dt, tzname: str):
-    tz = pytz.timezone(tzname)
+def _to_tz(dt,str):
     if isinstance(dt, datetime):
         if dt.tzinfo is None:
             return tz.localize(dt)
