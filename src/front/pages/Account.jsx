@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import useGlobalReducer from "../hooks/useGlobalReducer.jsx";
+import { useNavigate } from "react-router-dom"; // Add this import
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
@@ -84,6 +85,7 @@ export const Account = () => {
 
   const token = store?.token ?? true;
   const email = store?.user?.email ?? "Guest";
+  const navigate = useNavigate();
 
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -186,6 +188,11 @@ export const Account = () => {
     );
   }
 
+  // Logout handler
+  const handleLogout = () => {
+    navigate("/");
+  };
+
   return (
     // Lock outer page scroll; only the list scrolls
     <div
@@ -194,10 +201,28 @@ export const Account = () => {
     >
       <main className="container py-4 d-flex flex-column" style={{ flex: 1, minHeight: 0 }}>
         {/* Top-right logo */}
-        <div className="d-flex justify-content-end">
+        <div className="d-flex justify-content-end align-items-center" style={{ marginBottom: "8px" }}>
           <span className="navbar-brand mb-0 h1">
             WhiteGlove <span className="text-primary">BnB</span>
           </span>
+        </div>
+        {/* Logout button below logo with less vertical space */}
+        <div className="d-flex justify-content-end" style={{ marginBottom: "16px" }}>
+          <button
+            className="btn"
+            style={{
+              backgroundColor: "#007bff",
+              color: "#fff",
+              fontWeight: "bold",
+              minWidth: 120,
+              paddingTop: "6px",
+              paddingBottom: "6px",
+            }}
+            type="button"
+            onClick={handleLogout}
+          >
+            Logout
+          </button>
         </div>
 
         <h1 className="h4 mb-3">Welcome {email}</h1>
@@ -222,8 +247,8 @@ export const Account = () => {
           }}
         >
           {items.map((it, idx) => {
-            const shaded = isPast(it.checkoutDate);               // old reservations look lighter
-            const showCurrent = isCurrent(it.checkinDate, it.checkoutDate); // badge only when hosting now
+            const shaded = isPast(it.checkoutDate);
+            const showCurrent = isCurrent(it.checkinDate, it.checkoutDate);
 
             return (
               <div
@@ -268,11 +293,20 @@ export const Account = () => {
                           <strong>Check-out:</strong> {it.checkoutText || "—"}
                         </div>
 
-                        <input
-                          type="text"
-                          className="form-control form-control-sm text-muted"
-                          placeholder="write your personalized note here"
-                        />
+                        {/* Replace text box with Preview button */}
+                        <button
+                          className="btn"
+                          style={{
+                            backgroundColor: "#007bff",
+                            color: "#fff",
+                            fontWeight: "bold",
+                            minWidth: 120,
+                            marginTop: "8px",
+                          }}
+                          type="button"
+                        >
+                          Preview
+                        </button>
                       </div>
                     </div>
                   </div>
