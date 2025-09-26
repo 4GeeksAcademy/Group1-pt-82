@@ -150,12 +150,6 @@ def to_direct_image_url(url: str) -> str:
 
 # --- Datetime helpers --------------------------------------------------------
 
-def _to_tz(dt,str):
-    if isinstance(dt, datetime):
-        if dt.tzinfo is None:
-            return tz.localize(dt)
-        return dt.astimezone(tz)
-    return tz.localize(datetime(dt.year, dt.month, dt.day, 0, 0, 0))
 
 def _fix_all_day_checkout(start, end):
     if isinstance(start, datetime) or isinstance(end, datetime):
