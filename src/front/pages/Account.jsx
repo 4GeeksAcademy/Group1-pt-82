@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import useGlobalReducer from "../hooks/useGlobalReducer.jsx";
-import { useNavigate } from "react-router-dom"; // Add this import
+import { Link, useNavigate } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
@@ -96,6 +96,7 @@ export const Account = () => {
     fetch(url)
       .then(async (r) => {
         const txt = await r.text();
+        console.log("Raw response:", txt);
         if (!r.ok) throw new Error(`HTTP ${r.status}: ${txt.slice(0, 200)}`);
         try {
           return JSON.parse(txt);
@@ -294,6 +295,7 @@ export const Account = () => {
                         </div>
 
                         {/* Replace text box with Preview button */}
+                       <Link to="/preview" className="mt-auto">
                         <button
                           className="btn"
                           style={{
@@ -304,9 +306,11 @@ export const Account = () => {
                             marginTop: "8px",
                           }}
                           type="button"
+                          
                         >
                           Preview
                         </button>
+                        </Link>
                       </div>
                     </div>
                   </div>
