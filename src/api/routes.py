@@ -29,12 +29,12 @@ def create_token():
     user = User.query.filter_by(email=email, password=password).first()
     if user is None:
         return jsonify({"msg": "Bad email or password"}), 401
-    access_token = create_access_token(identity=user.id)
+    access_token = create_access_token(identity=str(user.id))
     return jsonify({"token": access_token, "user_id": user.id})
 
 
-@api.route('/reset-password', methods=['POST'])
-def reset_password():
+@api.route('/forgot-password', methods=['POST'])
+def forgot_password():
     # Expect JSON: { "email": "user@email.com", "new_password": "NewStrongPass123!" }
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
@@ -78,8 +78,8 @@ def login():
     user = User.query.filter_by(email=email, password=password).first()
     if user is None:
         return jsonify({"msg": "Bad email or password"}), 401
-    access_token = create_access_token(identity=user.id)
-    return jsonify({"token": access_token, "user_id": user.id})
+    access_token = create_access_token(identity=str(user.id))
+    return jsonify({"token": access_token, "user": user.serialize()})
 
 
 @api.route("/account", methods=["GET"])
@@ -265,6 +265,7 @@ def _fetch_reserved_rows(tzname: str = DEFAULT_TZ) -> List[Dict[str, Any]]:
 
 
 @api.route("/calendar/reserved", methods=["GET"])
+@jwt_required()
 def calendar_reserved():
     tzname = request.args.get("tz") or DEFAULT_TZ
     try:
@@ -412,7 +413,7 @@ def get_nearby_restaurants():
         'longitude': longitude,
         'radius': radius,
         'categories': 'restaurants',
-        'limit': 5,
+        'limit': 6,
         'sort_by': 'distance'
     }
     try:
@@ -426,5 +427,39 @@ def get_nearby_restaurants():
             return jsonify(data), 200
         else:
             return jsonify({"error": "Failed to fetch restaurants"}), response.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# -----------------------------
+# Weather endpoints
+# -----------------------------
+
+
+@api.route("/weather/current", methods=["GET"])
+def get_current_weather():
+    """Get current weather using WeatherAPI.com"""
+    latitude = request.args.get('latitude')
+    longitude = request.args.get('longitude')
+    if not latitude or not longitude:
+        return jsonify({"error": "Latitude and longitude are required"}), 400
+    weather_api_key = os.getenv('WEATHER_API_KEY')
+    if not weather_api_key:
+        return jsonify({"error": "Weather API key not configured"}), 500
+    params = {
+        'key': weather_api_key,
+        'q': f"{latitude},{longitude}"
+    }
+    try:
+        response = requests.get(
+            'http://api.weatherapi.com/v1/current.json',
+            params=params
+        )
+        if response.status_code == 200:
+            data = response.json()
+            # Compose a simple weather string for the frontend
+            weather_str = f"{data['current']['temp_f']}°F, {data['current']['condition']['text']}"
+            return jsonify({"weather": weather_str, "icon": data['current']['condition']['icon']}), 200
+        else:
+            return jsonify({"error": "Failed to fetch weather data"}), response.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
