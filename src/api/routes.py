@@ -32,28 +32,6 @@ def create_token():
     access_token = create_access_token(identity=str(user.id))
     return jsonify({"token": access_token, "user_id": user.id})
 
-
-@api.route('/forgot-password', methods=['POST'])
-def forgot_password():
-    # Expect JSON: { "email": "user@email.com", "new_password": "NewStrongPass123!" }
-    data = request.get_json() or {}
-    email = (data.get("email") or "").strip().lower()
-    new_password = (data.get("new_password") or "").strip()
-
-    if not email or not new_password:
-        return jsonify({"error": "email_and_new_password_required"}), 400
-    if len(new_password) < 8:
-        return jsonify({"error": "password_too_short"}), 400
-
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        return jsonify({"error": "user_not_found"}), 404
-
-    user.password = generate_password_hash(new_password)
-    db.session.commit()
-    return jsonify({"ok": True}), 200
-
-
 @api.route("/signup", methods=["POST"])
 def signup():
     email = request.json.get("email")
@@ -65,7 +43,9 @@ def signup():
         return jsonify({"msg": "User already exists"}), 409
 
     new_user = User(email=email, password=password,
-                    security_question=favorite_pet, is_active=True)
+  
+                 favorite_pet=favorite_pet, is_active=True)
+
     db.session.add(new_user)
     db.session.commit()
     return jsonify({"msg": "User created successfully"}), 201
@@ -80,6 +60,7 @@ def login():
         return jsonify({"msg": "Bad email or password"}), 401
     access_token = create_access_token(identity=str(user.id))
     return jsonify({"token": access_token, "user": user.serialize()})
+
 
 
 @api.route("/account", methods=["GET"])
@@ -189,6 +170,15 @@ def _to_tz(dt, tzname):
 # --- Datetime helpers --------------------------------------------------------
 
 
+def _to_tz(dt, tzname: str):
+    tz = pytz.timezone(tzname)
+    if isinstance(dt, datetime):
+        if dt.tzinfo is None:
+            return tz.localize(dt)
+        return dt.astimezone(tz)
+    return tz.localize(datetime(dt.year, dt.month, dt.day, 0, 0, 0))
+
+
 def _fix_all_day_checkout(start, end):
     if isinstance(start, datetime) or isinstance(end, datetime):
         return end
@@ -292,6 +282,7 @@ def sync_reserved_to_db():
     if not listing_id:
         listing_id = request.args.get(
             "listing_id") or os.getenv("RESERVATIONS_LISTING_ID")
+
     if not listing_id:
         return jsonify({"error": "listing_id required"}), 400
     try:
@@ -463,3 +454,19 @@ def get_current_weather():
             return jsonify({"error": "Failed to fetch weather data"}), response.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@api.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+    favorite_pet = (data.get("favorite_pet") or "").strip()
+
+    if not email or not favorite_pet:
+        return jsonify({"error": "email_and_favorite_pet_required"}), 400
+
+    user = User.query.filter_by(email=email, favorite_pet=favorite_pet).first()
+    if not user:
+        return jsonify({"error": "user_not_found_or_wrong_answer"}), 404
+
+    return jsonify({"ok": True}), 200
+

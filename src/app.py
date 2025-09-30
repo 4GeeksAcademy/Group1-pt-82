@@ -24,7 +24,7 @@ app.config["JWT_SECRET_KEY"] = "super-secret"
 jwt = JWTManager(app)
 app.url_map.strict_slashes = False
 
-# Enable CORS for your frontend URL
+# Enable CORS for your frontend URL and allow credentials/headers for API routes
 CORS(app, origins=[
      "https://probable-memory-q76jw5rqjpqrcxx5q-3000.app.github.dev",
      "https://glorious-space-halibut-r49v46gv46qfx5qw-3000.app.github.dev"])

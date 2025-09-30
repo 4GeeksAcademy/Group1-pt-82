@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 export const Signup = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [pet, setPet] = useState(""); // Add this missing state variable
+  const [favorite_pet, setPet] = useState(""); // Add this missing state variable
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -24,10 +24,10 @@ export const Signup = () => {
         body: JSON.stringify({
           email,
           password,
-          favorite_pet: pet // Add this to match your backend
+          favorite_pet
         })
       });
-
+      console.log("Response status:", response);
       if (response.ok) {
         navigate("/login", { state: { justSignedUp: true } });
       } else {
@@ -35,6 +35,7 @@ export const Signup = () => {
         setErr(data.msg || "Signup failed");
       }
     } catch (error) {
+      console.error("Error during signup:", error);
       setErr("Unable to create account. Please try again.");
     } finally {
       setBusy(false);
@@ -122,7 +123,7 @@ export const Signup = () => {
                           id="signupPet"
                           className="form-control"
                           type="text"
-                          value={pet}
+                          value={favorite_pet}
                           onChange={(e) => setPet(e.target.value)}
                           required
                           placeholder="Enter your favorite pet"

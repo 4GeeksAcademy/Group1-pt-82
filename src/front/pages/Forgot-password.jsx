@@ -7,11 +7,22 @@ export const ForgotPassword = () => {
     const [email, setEmail] = useState("");
     const [favoritePet, setFavoritePet] = useState("");
     const [busy, setBusy] = useState(false);
-    const [resultText, setResultText] = useState(""); // shows password or error
 
-    const handleSubmit = async (e) => {
+    // Step 2 (after verification)
+    const [verified, setVerified] = useState(false);
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [updating, setUpdating] = useState(false);
+
+    // Messaging
+    const [message, setMessage] = useState("");      // success / info
+    const [error, setError] = useState("");          // errors for either step
+
+    // Step 1: verify email + favorite pet
+    const handleVerify = async (e) => {
         e.preventDefault();
-        setResultText("");
+        setMessage("");
+        setError("");
         setBusy(true);
 
         try {
@@ -25,16 +36,60 @@ export const ForgotPassword = () => {
             });
 
             if (res.ok) {
-                const data = await res.json();
-                // Reveal password on success (as you specified for this project)
-                setResultText(data?.password ?? "");
+                // We don't reveal any password. A 200 means verification OK.
+                setVerified(true);
+                setMessage("Identity verified. Please set a new password below.");
             } else {
-                setResultText("The information entered is incorrect, please contact the administator");
+                setError("The information entered is incorrect, please contact the administrator.");
             }
-        } catch {
-            setResultText("The information entered is incorrect, please contact the administator");
+        } catch (err) {
+            setError("The information entered is incorrect, please contact the administrator.");
         } finally {
             setBusy(false);
+        }
+    };
+
+    // Step 2: submit new password
+    const handleUpdatePassword = async (e) => {
+        e.preventDefault();
+        setMessage("");
+        setError("");
+
+        // Basic client-side validation (adjust to your policy)
+        if (!newPassword || newPassword.length < 8) {
+            setError("Password must be at least 8 characters.");
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setError("Passwords do not match.");
+            return;
+        }
+
+        setUpdating(true);
+        try {
+            // Adjust endpoint/body as needed for your backend
+            const res = await fetch(`${API_BASE_URL}/api/reset-password`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email: email.trim(),
+                    new_password: newPassword,
+                }),
+            });
+
+            if (res.ok) {
+                setMessage("Your password has been updated successfully. You can now sign in.");
+                // Optionally clear fields
+                setNewPassword("");
+                setConfirmPassword("");
+            } else {
+                const text = await res.text().catch(() => "");
+                setError(text || "Unable to update password. Please try again or contact the administrator.");
+            }
+        } catch {
+            setError("Unable to update password. Please try again or contact the administrator.");
+        } finally {
+            setUpdating(false);
         }
     };
 
@@ -46,59 +101,106 @@ export const ForgotPassword = () => {
                         <div className="card-body p-4 p-md-5">
                             <h1 className="h4 text-center mb-2">Forgot Password</h1>
                             <p className="text-muted text-center mb-4">
-                                Enter your Email and Favorite Pet then submit to get your password.
+                                Enter your Email and Favorite Pet to verify your identity.
                             </p>
 
-                            <form onSubmit={handleSubmit} noValidate>
-                                <div className="mb-3 text-center">
-                                    <label htmlFor="fpEmail" className="form-label">Email</label>
-                                    <input
-                                        id="fpEmail"
-                                        type="email"
-                                        className="form-control mx-auto"
-                                        style={{ maxWidth: 420 }}
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        autoComplete="email"
-                                        required
-                                        placeholder="you@example.com"
-                                    />
-                                </div>
+                            {/* STEP 1: Verify identity */}
+                            <form onSubmit={handleVerify} noValidate>
+                                <fieldset disabled={busy || verified}>
+                                    <div className="mb-3 text-center">
+                                        <label htmlFor="fpEmail" className="form-label">Email</label>
+                                        <input
+                                            id="fpEmail"
+                                            type="email"
+                                            className="form-control mx-auto"
+                                            style={{ maxWidth: 420 }}
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            autoComplete="email"
+                                            required
+                                            placeholder="you@example.com"
+                                        />
+                                    </div>
 
-                                <div className="mb-3 text-center">
-                                    <label htmlFor="fpPet" className="form-label">Favorite Pet</label>
-                                    <input
-                                        id="fpPet"
-                                        type="text"
-                                        className="form-control mx-auto"
-                                        style={{ maxWidth: 420 }}
-                                        value={favoritePet}
-                                        onChange={(e) => setFavoritePet(e.target.value)}
-                                        autoComplete="off"
-                                        required
-                                        placeholder="e.g., Luna"
-                                    />
-                                </div>
+                                    <div className="mb-3 text-center">
+                                        <label htmlFor="fpPet" className="form-label">Favorite Pet</label>
+                                        <input
+                                            id="fpPet"
+                                            type="text"
+                                            className="form-control mx-auto"
+                                            style={{ maxWidth: 420 }}
+                                            value={favoritePet}
+                                            onChange={(e) => setFavoritePet(e.target.value)}
+                                            autoComplete="off"
+                                            required
+                                            placeholder="e.g., Luna"
+                                        />
+                                    </div>
 
-                                <div className="text-center">
-                                    <button type="submit" className="btn btn-primary" disabled={busy}>
-                                        {busy ? "Checking..." : "Submit"}
-                                    </button>
-                                </div>
+                                    <div className="text-center">
+                                        <button type="submit" className="btn btn-primary" disabled={busy || verified}>
+                                            {busy ? "Checking..." : "Submit"}
+                                        </button>
+                                    </div>
+                                </fieldset>
                             </form>
 
-                            {/* Box directly under the submit button */}
-                            <div
-                                className="form-control mt-3 mx-auto text-center"
-                                style={{ maxWidth: 420, minHeight: 56, display: "flex", alignItems: "center", justifyContent: "center" }}
-                                aria-live="polite"
-                            >
-                                {resultText}
-                            </div>
+                            {/* Messages */}
+                            {(error || message) && (
+                                <div
+                                    className={`mt-3 mx-auto text-center alert ${error ? "alert-danger" : "alert-success"}`}
+                                    style={{ maxWidth: 420 }}
+                                    role="status"
+                                    aria-live="polite"
+                                >
+                                    {error || message}
+                                </div>
+                            )}
 
-                            <div className="text-center mt-3">
-                                <Link to="/login">Return to sign-in page</Link>
-                            </div>
+                            {/* STEP 2: New password fields (only after verification succeeds) */}
+                            {verified && (
+                                <form onSubmit={handleUpdatePassword} className="mt-4">
+                                    <div className="mb-3 text-center">
+                                        <label htmlFor="fpNew" className="form-label">New Password</label>
+                                        <input
+                                            id="fpNew"
+                                            type="password"
+                                            className="form-control mx-auto"
+                                            style={{ maxWidth: 420 }}
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            placeholder="Enter new password"
+                                            required
+                                        />
+                                        <div className="form-text">Must be at least 8 characters.</div>
+                                    </div>
+
+                                    <div className="mb-3 text-center">
+                                        <label htmlFor="fpConfirm" className="form-label">Confirm New Password</label>
+                                        <input
+                                            id="fpConfirm"
+                                            type="password"
+                                            className="form-control mx-auto"
+                                            style={{ maxWidth: 420 }}
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            placeholder="Re-type new password"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="text-center">
+                                        <button type="submit" className="btn btn-success" disabled={updating}>
+                                            {updating ? "Updating..." : "Update Password"}
+                                        </button>
+                                    </div>
+
+                                    {/* Link back to sign-in below the second box */}
+                                    <div className="text-center mt-3">
+                                        <Link to="/login">Return to sign-in page</Link>
+                                    </div>
+                                </form>
+                            )}
                         </div>
                     </div>
                 </div>
