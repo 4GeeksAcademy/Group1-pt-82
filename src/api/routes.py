@@ -29,30 +29,8 @@ def create_token():
     user = User.query.filter_by(email=email, password=password).first()
     if user is None:
         return jsonify({"msg": "Bad email or password"}), 401
-    access_token = create_access_token(identity=user.id)
+    access_token = create_access_token(identity=str(user.id))
     return jsonify({"token": access_token, "user_id": user.id})
-
-
-# @api.route('/forgot-password', methods=['POST'])
-# def forgot_password():
-#     # Expect JSON: { "email": "user@email.com", "new_password": "NewStrongPass123!" }
-#     data = request.get_json() or {}
-#     email = (data.get("email") or "").strip().lower()
-#     new_password = (data.get("new_password") or "").strip()
-
-#     if not email or not new_password:
-#         return jsonify({"error": "email_and_favorite_pet_required"}), 400
-#     if len(new_password) < 8:
-#         return jsonify({"error": "password_too_short"}), 400
-
-#     user = User.query.filter_by(email=email).first()
-#     if not user:
-#         return jsonify({"error": "user_not_found"}), 404
-
-#     user.password = generate_password_hash(new_password)
-#     db.session.commit()
-#     return jsonify({"ok": True}), 200
-
 
 @api.route("/signup", methods=["POST"])
 def signup():
@@ -65,7 +43,9 @@ def signup():
         return jsonify({"msg": "User already exists"}), 409
 
     new_user = User(email=email, password=password,
-                    favorite_pet=favorite_pet, is_active=True)
+  
+                 favorite_pet=favorite_pet, is_active=True)
+
     db.session.add(new_user)
     db.session.commit()
     return jsonify({"msg": "User created successfully"}), 201
@@ -78,8 +58,9 @@ def login():
     user = User.query.filter_by(email=email, password=password).first()
     if user is None:
         return jsonify({"msg": "Bad email or password"}), 401
-    access_token = create_access_token(identity=user.id)
-    return jsonify({"token": access_token, "user_id": user.id})
+    access_token = create_access_token(identity=str(user.id))
+    return jsonify({"token": access_token, "user": user.serialize()})
+
 
 
 @api.route("/account", methods=["GET"])
@@ -165,6 +146,27 @@ def to_direct_image_url(url: str) -> str:
     # Fallback: return original (may still work if server responds with image content-type)
     return url
 
+
+def _to_tz(dt, tzname):
+    """
+    Convert a datetime to the specified timezone.
+    If dt is a date (not datetime), convert it to a datetime at midnight.
+    """
+    if not dt:
+        return dt
+
+    # If it's a date, convert to datetime at midnight
+    if isinstance(dt, date) and not isinstance(dt, datetime):
+        dt = datetime.combine(dt, datetime.min.time())
+
+    # If it's naive, assume UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    # Convert to target timezone
+    target_tz = pytz.timezone(tzname)
+    return dt.astimezone(target_tz)
+
 # --- Datetime helpers --------------------------------------------------------
 
 
@@ -215,40 +217,31 @@ def _first_image_from_vevent(vevent) -> str | None:
 def _fetch_reserved_rows(tzname: str = DEFAULT_TZ) -> List[Dict[str, Any]]:
     if not RESERVATIONS_ICS_URL:
         raise RuntimeError("RESERVATIONS_ICS_URL is not configured")
-
     resp = requests.get(RESERVATIONS_ICS_URL, timeout=30)
     resp.raise_for_status()
     cal = Calendar.from_ical(resp.content)
-
     rows: List[Dict[str, Any]] = []
     for vevent in cal.walk("vevent"):
         summary = str(vevent.get("summary") or "")
         if "reserved" not in summary.lower():
             continue
-
         uid = str(vevent.get("uid") or "").strip()
         if not uid:
             continue
-
         dtstart = vevent.get("dtstart") and vevent.get("dtstart").dt
         dtend = vevent.get("dtend") and vevent.get("dtend").dt
         if not dtstart or not dtend:
             continue
-
         start_local = _to_tz(dtstart, tzname)
         end_local = _to_tz(dtend, tzname)
-
         checkout_display = end_local
         if not isinstance(dtstart, datetime) and not isinstance(dtend, datetime):
             checkout_display = _to_tz(
                 _fix_all_day_checkout(dtstart, dtend), tzname)
-
         desc = str(vevent.get("description") or "")
         m_url = RE_URL.search(desc)
         reservation_url = m_url.group(1) if m_url else None
-
         image_url = _first_image_from_vevent(vevent)
-
         rows.append({
             "event": uid,
             "title": summary.strip(),
@@ -262,6 +255,7 @@ def _fetch_reserved_rows(tzname: str = DEFAULT_TZ) -> List[Dict[str, Any]]:
 
 
 @api.route("/calendar/reserved", methods=["GET"])
+@jwt_required()
 def calendar_reserved():
     tzname = request.args.get("tz") or DEFAULT_TZ
     try:
@@ -270,7 +264,6 @@ def calendar_reserved():
     except Exception as e:
         current_app.logger.exception("calendar_reserved failed: %s", e)
         return jsonify({"error": str(e)}), 500
-
 # ------------------------------------------------
 # Admin: sync ICS rows into DB as Booking records
 # ------------------------------------------------
@@ -292,31 +285,25 @@ def sync_reserved_to_db():
 
     if not listing_id:
         return jsonify({"error": "listing_id required"}), 400
-
     try:
         listing_id = int(listing_id)
     except Exception:
         return jsonify({"error": "listing_id must be an integer"}), 400
-
     # Ensure listing exists
     if not db.session.get(Listing, listing_id):
         return jsonify({"error": f"listing_id {listing_id} not found"}), 404
-
     rows = _fetch_reserved_rows()
     created = updated = 0
-
     for r in rows:
         uid = r["event"]
         ci = date.fromisoformat(r["checkin"][:10])
         co = date.fromisoformat(r["checkout"][:10])
-
         booking = db.session.execute(
             select(Booking).where(
                 Booking.listing_id == listing_id,
                 Booking.google_calendar_id == uid
             )
         ).scalar_one_or_none()
-
         if booking is None:
             booking = Booking(
                 listing_id=listing_id,
@@ -327,16 +314,13 @@ def sync_reserved_to_db():
             created += 1
         else:
             updated += 1
-
         booking.airbnb_checkin = ci
         booking.airbnb_checkout = co
         booking.reservation_url = r.get("reservation_url")
         booking.phone_last4 = r.get("phone_last4")
         booking.airbnb_guestpic_url = r.get("image")
-
     db.session.commit()
     return jsonify({"ok": True, "created": created, "updated": updated}), 200
-
 # ------------------------------------------------
 # Admin: manually punch guest names and profile pic
 # ------------------------------------------------
@@ -347,7 +331,6 @@ def admin_update_booking(booking_id: int):
     b = db.session.get(Booking, booking_id)
     if not b:
         return jsonify({"error": "not found"}), 404
-
     data = request.get_json(silent=True) or {}
     if "first_name" in data:
         b.airbnb_guest_first_name = (data["first_name"] or "").strip() or None
@@ -362,14 +345,11 @@ def admin_update_booking(booking_id: int):
                 b.listing_id = new_listing_id
         except Exception:
             pass
-
     # Mark complete if both names are present (tweak rule as desired)
     if b.airbnb_guest_first_name and b.airbnb_guest_last_name:
         b.needs_manual_details = False
-
     db.session.commit()
     return jsonify(b.serialize()), 200
-
 # -----------------------------
 # Public bookings read API
 # -----------------------------
@@ -387,7 +367,6 @@ def list_bookings():
     listing_id = request.args.get("listing_id")
     start = request.args.get("start")
     end = request.args.get("end")
-
     if listing_id:
         try:
             q = q.where(Booking.listing_id == int(listing_id))
@@ -399,10 +378,8 @@ def list_bookings():
     if end:
         e = date.fromisoformat(end)
         q = q.where(Booking.airbnb_checkin <= e)
-
     items = db.session.execute(q).scalars().all()
     return jsonify([b.serialize() for b in items]), 200
-
 # -----------------------------
 # Restaurant endpoints
 # -----------------------------
@@ -414,43 +391,69 @@ def get_nearby_restaurants():
     latitude = request.args.get('latitude')
     longitude = request.args.get('longitude')
     radius = request.args.get('radius', 5000)  # Default 5km radius
-
     if not latitude or not longitude:
         return jsonify({"error": "Latitude and longitude are required"}), 400
-
     yelp_api_key = os.getenv('YELP_API_KEY')
     if not yelp_api_key:
         return jsonify({"error": "Yelp API key not configured"}), 500
-
     headers = {
         'Authorization': f'Bearer {yelp_api_key}',
     }
-
     params = {
         'latitude': latitude,
         'longitude': longitude,
         'radius': radius,
         'categories': 'restaurants',
-        'limit': 5,
+        'limit': 6,
         'sort_by': 'distance'
     }
-
     try:
         response = requests.get(
             'https://api.yelp.com/v3/businesses/search',
             headers=headers,
             params=params
         )
-
         if response.status_code == 200:
             data = response.json()
             return jsonify(data), 200
         else:
             return jsonify({"error": "Failed to fetch restaurants"}), response.status_code
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# -----------------------------
+# Weather endpoints
+# -----------------------------
+
+
+@api.route("/weather/current", methods=["GET"])
+def get_current_weather():
+    """Get current weather using WeatherAPI.com"""
+    latitude = request.args.get('latitude')
+    longitude = request.args.get('longitude')
+    if not latitude or not longitude:
+        return jsonify({"error": "Latitude and longitude are required"}), 400
+    weather_api_key = os.getenv('WEATHER_API_KEY')
+    if not weather_api_key:
+        return jsonify({"error": "Weather API key not configured"}), 500
+    params = {
+        'key': weather_api_key,
+        'q': f"{latitude},{longitude}"
+    }
+    try:
+        response = requests.get(
+            'http://api.weatherapi.com/v1/current.json',
+            params=params
+        )
+        if response.status_code == 200:
+            data = response.json()
+            # Compose a simple weather string for the frontend
+            weather_str = f"{data['current']['temp_f']}°F, {data['current']['condition']['text']}"
+            return jsonify({"weather": weather_str, "icon": data['current']['condition']['icon']}), 200
+        else:
+            return jsonify({"error": "Failed to fetch weather data"}), response.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @api.route('/forgot-password', methods=['POST'])
 def forgot_password():
@@ -466,3 +469,4 @@ def forgot_password():
         return jsonify({"error": "user_not_found_or_wrong_answer"}), 404
 
     return jsonify({"ok": True}), 200
+

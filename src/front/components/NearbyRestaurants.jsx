@@ -20,7 +20,7 @@ export const NearbyRestaurants = () => {
 
         try {
             const response = await fetch(
-                `${import.meta.env.VITE_BACKEND_URL}api/restaurants/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radius=5000`
+                `https://probable-memory-q76jw5rqjpqrcxx5q-3001.app.github.dev/api/restaurants/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radius=5000`
             );
 
             if (response.ok) {

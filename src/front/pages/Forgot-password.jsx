@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 
-const API_BASE_URL = "https://glorious-space-halibut-r49v46gv46qfx5qw-3001.app.github.dev";
+const API_BASE_URL = "https://probable-memory-q76jw5rqjpqrcxx5q-3001.app.github.dev/forgot-password";
 
 export const ForgotPassword = () => {
     const [email, setEmail] = useState("");
