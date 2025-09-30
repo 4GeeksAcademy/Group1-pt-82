@@ -190,6 +190,9 @@ export const Account = () => {
 
   // Logout handler
   const handleLogout = () => {
+    localStorage.removeItem("token");
+    // If you have a reducer, you can also dispatch a logout action here:
+    // dispatch({ type: "LOGOUT" });
     navigate("/");
   };
 

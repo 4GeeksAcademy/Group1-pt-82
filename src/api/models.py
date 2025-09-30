@@ -31,7 +31,7 @@ class User(db.Model):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     # Preserved original fields
-    security_question: Mapped[Optional[str]] = mapped_column(
+    favorite_pet: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True)
     jpeg: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
     # Relationship (listings)
@@ -48,7 +48,7 @@ class User(db.Model):
             "id": self.id,
             "email": self.email,
             "is_active": self.is_active,
-            "security_question": self.security_question,
+            "favorite_pet": self.favorite_pet,
         }
 # ---- Listing ----------------------------------------------------------------
 

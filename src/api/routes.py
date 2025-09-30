@@ -21,6 +21,7 @@ CORS(api, supports_credentials=True, origins="*")
 # Auth endpoints (simple demo)
 # -----------------------------
 
+
 @api.route("/token", methods=["POST"])
 def create_token():
     email = request.json.get("email")
@@ -31,25 +32,27 @@ def create_token():
     access_token = create_access_token(identity=user.id)
     return jsonify({"token": access_token, "user_id": user.id})
 
-@api.route('/reset-password', methods=['POST'])
-def reset_password():
-    # Expect JSON: { "email": "user@email.com", "new_password": "NewStrongPass123!" }
-    data = request.get_json() or {}
-    email = (data.get("email") or "").strip().lower()
-    new_password = (data.get("new_password") or "").strip()
 
-    if not email or not new_password:
-        return jsonify({"error": "email_and_new_password_required"}), 400
-    if len(new_password) < 8:
-        return jsonify({"error": "password_too_short"}), 400
+# @api.route('/forgot-password', methods=['POST'])
+# def forgot_password():
+#     # Expect JSON: { "email": "user@email.com", "new_password": "NewStrongPass123!" }
+#     data = request.get_json() or {}
+#     email = (data.get("email") or "").strip().lower()
+#     new_password = (data.get("new_password") or "").strip()
 
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        return jsonify({"error": "user_not_found"}), 404
+#     if not email or not new_password:
+#         return jsonify({"error": "email_and_favorite_pet_required"}), 400
+#     if len(new_password) < 8:
+#         return jsonify({"error": "password_too_short"}), 400
 
-    user.password = generate_password_hash(new_password)     
-    db.session.commit()
-    return jsonify({"ok": True}), 200
+#     user = User.query.filter_by(email=email).first()
+#     if not user:
+#         return jsonify({"error": "user_not_found"}), 404
+
+#     user.password = generate_password_hash(new_password)
+#     db.session.commit()
+#     return jsonify({"ok": True}), 200
+
 
 @api.route("/signup", methods=["POST"])
 def signup():
@@ -61,10 +64,12 @@ def signup():
     if existing_user is not None:
         return jsonify({"msg": "User already exists"}), 409
 
-    new_user = User(email=email, password=password, security_question=favorite_pet, is_active=True)
+    new_user = User(email=email, password=password,
+                    favorite_pet=favorite_pet, is_active=True)
     db.session.add(new_user)
     db.session.commit()
     return jsonify({"msg": "User created successfully"}), 201
+
 
 @api.route("/login", methods=["POST"])
 def login():
@@ -76,6 +81,7 @@ def login():
     access_token = create_access_token(identity=user.id)
     return jsonify({"token": access_token, "user_id": user.id})
 
+
 @api.route("/account", methods=["GET"])
 @jwt_required()
 def protect_account():
@@ -83,12 +89,14 @@ def protect_account():
     user = User.query.get(current_user_id)
     return jsonify({"id": user.id, "email": user.email}), 200
 
+
 @api.route("/preview", methods=["GET"])
 @jwt_required()
 def protect_preview():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     return jsonify({"id": user.id, "email": user.email}), 200
+
 
 @api.route("/admin/users", methods=["GET"])
 def list_all_users():
@@ -102,6 +110,7 @@ def list_all_users():
         "users": [user.serialize() for user in users]
     }), 200
 
+
 @api.route("/hello", methods=["GET"])
 def handle_hello():
     return jsonify({
@@ -112,8 +121,10 @@ def handle_hello():
 # Calendar (ICS) parsing + JSON exposure (Jose2 ENHANCED)
 # -----------------------------
 
+
 def _env(name: str, default: str | None = None) -> str | None:
     return os.environ.get(name, default)
+
 
 RESERVATIONS_ICS_URL = _env("RESERVATIONS_ICS_URL") or (
     "https://calendar.google.com/calendar/ical/"
@@ -124,9 +135,13 @@ DEFAULT_TZ = _env("DEFAULT_TIMEZONE", "America/New_York")
 # --- URL helpers -------------------------------------------------------------
 RE_URL = re.compile(r"(https?://[^\s)]+)", re.I)
 RE_EXT_IMAGE = re.compile(r"\.(?:png|jpe?g|webp|gif)(?:\?.*)?$", re.I)
-RE_DRIVE_FILE_VIEW = re.compile(r"https?://drive\.google\.com/file/d/([^/]+)/view(?:\?[^ ]*)?", re.I)
-RE_DRIVE_OPEN = re.compile(r"https?://drive\.google\.com/open\?id=([^&]+)", re.I)
-RE_DRIVE_UC = re.compile(r"https?://drive\.google\.com/uc\?(?:export=\w+&)?id=([^&]+)", re.I)
+RE_DRIVE_FILE_VIEW = re.compile(
+    r"https?://drive\.google\.com/file/d/([^/]+)/view(?:\?[^ ]*)?", re.I)
+RE_DRIVE_OPEN = re.compile(
+    r"https?://drive\.google\.com/open\?id=([^&]+)", re.I)
+RE_DRIVE_UC = re.compile(
+    r"https?://drive\.google\.com/uc\?(?:export=\w+&)?id=([^&]+)", re.I)
+
 
 def to_direct_image_url(url: str) -> str:
     """
@@ -137,7 +152,8 @@ def to_direct_image_url(url: str) -> str:
         return url
 
     # Google Drive conversions
-    m = RE_DRIVE_FILE_VIEW.search(url) or RE_DRIVE_OPEN.search(url) or RE_DRIVE_UC.search(url)
+    m = RE_DRIVE_FILE_VIEW.search(url) or RE_DRIVE_OPEN.search(
+        url) or RE_DRIVE_UC.search(url)
     if m:
         file_id = m.group(1)
         return f"https://drive.google.com/uc?export=view&id={file_id}"
@@ -151,6 +167,7 @@ def to_direct_image_url(url: str) -> str:
 
 # --- Datetime helpers --------------------------------------------------------
 
+
 def _to_tz(dt, tzname: str):
     tz = pytz.timezone(tzname)
     if isinstance(dt, datetime):
@@ -159,12 +176,14 @@ def _to_tz(dt, tzname: str):
         return dt.astimezone(tz)
     return tz.localize(datetime(dt.year, dt.month, dt.day, 0, 0, 0))
 
+
 def _fix_all_day_checkout(start, end):
     if isinstance(start, datetime) or isinstance(end, datetime):
         return end
     return end - timedelta(days=1)
 
 # --- Image extraction --------------------------------------------------------
+
 
 def _first_image_from_vevent(vevent) -> str | None:
     """
@@ -191,6 +210,7 @@ def _first_image_from_vevent(vevent) -> str | None:
     return None
 
 # --- Core ICS parsing --------------------------------------------------------
+
 
 def _fetch_reserved_rows(tzname: str = DEFAULT_TZ) -> List[Dict[str, Any]]:
     if not RESERVATIONS_ICS_URL:
@@ -220,7 +240,8 @@ def _fetch_reserved_rows(tzname: str = DEFAULT_TZ) -> List[Dict[str, Any]]:
 
         checkout_display = end_local
         if not isinstance(dtstart, datetime) and not isinstance(dtend, datetime):
-            checkout_display = _to_tz(_fix_all_day_checkout(dtstart, dtend), tzname)
+            checkout_display = _to_tz(
+                _fix_all_day_checkout(dtstart, dtend), tzname)
 
         desc = str(vevent.get("description") or "")
         m_url = RE_URL.search(desc)
@@ -239,6 +260,7 @@ def _fetch_reserved_rows(tzname: str = DEFAULT_TZ) -> List[Dict[str, Any]]:
     rows.sort(key=lambda x: x["checkin"])
     return rows
 
+
 @api.route("/calendar/reserved", methods=["GET"])
 def calendar_reserved():
     tzname = request.args.get("tz") or DEFAULT_TZ
@@ -253,6 +275,7 @@ def calendar_reserved():
 # Admin: sync ICS rows into DB as Booking records
 # ------------------------------------------------
 
+
 @api.route("/admin/sync-reserved", methods=["POST"])
 def sync_reserved_to_db():
     """
@@ -264,7 +287,8 @@ def sync_reserved_to_db():
     if request.is_json:
         listing_id = request.json.get("listing_id")
     if not listing_id:
-        listing_id = request.args.get("listing_id") or os.getenv("RESERVATIONS_LISTING_ID")
+        listing_id = request.args.get(
+            "listing_id") or os.getenv("RESERVATIONS_LISTING_ID")
 
     if not listing_id:
         return jsonify({"error": "listing_id required"}), 400
@@ -317,6 +341,7 @@ def sync_reserved_to_db():
 # Admin: manually punch guest names and profile pic
 # ------------------------------------------------
 
+
 @api.route("/admin/bookings/<int:booking_id>", methods=["PATCH"])
 def admin_update_booking(booking_id: int):
     b = db.session.get(Booking, booking_id)
@@ -349,6 +374,7 @@ def admin_update_booking(booking_id: int):
 # Public bookings read API
 # -----------------------------
 
+
 @api.route("/bookings", methods=["GET"])
 def list_bookings():
     """
@@ -380,6 +406,7 @@ def list_bookings():
 # -----------------------------
 # Restaurant endpoints
 # -----------------------------
+
 
 @api.route("/restaurants/nearby", methods=["GET"])
 def get_nearby_restaurants():
@@ -423,3 +450,19 @@ def get_nearby_restaurants():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@api.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+    favorite_pet = (data.get("favorite_pet") or "").strip()
+
+    if not email or not favorite_pet:
+        return jsonify({"error": "email_and_favorite_pet_required"}), 400
+
+    user = User.query.filter_by(email=email, favorite_pet=favorite_pet).first()
+    if not user:
+        return jsonify({"error": "user_not_found_or_wrong_answer"}), 404
+
+    return jsonify({"ok": True}), 200
