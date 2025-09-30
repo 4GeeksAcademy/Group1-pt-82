@@ -16,8 +16,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 db = SQLAlchemy()
 # ---- User -------------------------------------------------------------------
-
-
 class User(db.Model):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -39,10 +37,8 @@ class User(db.Model):
         back_populates="owner",
         cascade="all, delete-orphan"
     )
-
     def __repr__(self) -> str:
         return f"<User {self.id} {self.email}>"
-
     def serialize(self) -> dict:
         return {
             "id": self.id,
@@ -51,8 +47,6 @@ class User(db.Model):
             "security_question": self.security_question,
         }
 # ---- Listing ----------------------------------------------------------------
-
-
 class Listing(db.Model):
     __tablename__ = "listings"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -93,10 +87,8 @@ class Listing(db.Model):
         viewonly=False,
         uselist=False,
     )
-
     def __repr__(self) -> str:
         return f"<Listing {self.id} {self.name or ''}>"
-
     def serialize(self) -> dict:
         return {
             "id": self.id,
@@ -111,8 +103,6 @@ class Listing(db.Model):
             "airbnb_zipcode": self.airbnb_zipcode,
         }
 # ---- Booking ----------------------------------------------------------------
-
-
 class Booking(db.Model):
     __tablename__ = "bookings"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -159,10 +149,8 @@ class Booking(db.Model):
         UniqueConstraint("listing_id", "google_calendar_id",
                          name="uq_booking_listing_googleid"),
     )
-
     def __repr__(self) -> str:
         return f"<Booking {self.id} {self.google_calendar_id or ''}>"
-
     def serialize(self) -> dict:
         return {
             "id": self.id,

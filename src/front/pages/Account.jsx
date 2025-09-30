@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import useGlobalReducer from "../hooks/useGlobalReducer.jsx";
-import { useNavigate } from "react-router-dom"; // Add this import
+import { Link, useNavigate } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
@@ -83,7 +83,7 @@ export const Account = () => {
   const { store } =
     (typeof useGlobalReducer === "function" ? useGlobalReducer() : { store: {} }) || { store: {} };
 
-  const token = store?.token ?? true;
+  const token = store?.session?.token;
   const email = store?.user?.email ?? "Guest";
   const navigate = useNavigate();
 
@@ -93,9 +93,12 @@ export const Account = () => {
 
   useEffect(() => {
     const url = `${API_BASE}/calendar/reserved?tz=America/New_York`;
-    fetch(url)
+    fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    })
       .then(async (r) => {
         const txt = await r.text();
+        console.log("Raw response:", txt);
         if (!r.ok) throw new Error(`HTTP ${r.status}: ${txt.slice(0, 200)}`);
         try {
           return JSON.parse(txt);
@@ -294,19 +297,25 @@ export const Account = () => {
                         </div>
 
                         {/* Replace text box with Preview button */}
-                        <button
-                          className="btn"
-                          style={{
-                            backgroundColor: "#007bff",
-                            color: "#fff",
-                            fontWeight: "bold",
-                            minWidth: 120,
-                            marginTop: "8px",
-                          }}
-                          type="button"
+                        <Link
+                          to="/preview"
+                          state={{ guestName: it.guestName, image: it.image }}
+                          className="mt-auto"
                         >
-                          Preview
-                        </button>
+                          <button
+                            className="btn"
+                            style={{
+                              backgroundColor: "#007bff",
+                              color: "#fff",
+                              fontWeight: "bold",
+                              minWidth: 120,
+                              marginTop: "8px",
+                            }}
+                            type="button"
+                          >
+                            Preview
+                          </button>
+                        </Link>
                       </div>
                     </div>
                   </div>
