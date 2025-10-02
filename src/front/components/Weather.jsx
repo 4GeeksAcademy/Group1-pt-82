@@ -45,7 +45,7 @@ export const Weather = ({ latitude, longitude }) => {
                 fontSize: 32,
                 fontWeight: 600,
                 color: "#333",
-                textAlign: "center", // optional, for multi-line
+                textAlign: "center",
             }}
         >
             {loading ? "Loading..." : error ? error : weather}

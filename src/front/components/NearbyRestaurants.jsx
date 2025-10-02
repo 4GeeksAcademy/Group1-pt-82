@@ -58,10 +58,9 @@ export const NearbyRestaurants = () => {
     }
 
     return (
-        <div className="container">
-            <h2>Nearby Restaurants</h2>
-
-            <p className="text-muted">
+        <div className="container" style={{ border: '1px solid #ccc', padding: 16, borderRadius: 8, maxWidth: '50%', marginLeft: 0, marginRight: 'auto', textAlign: 'left' }}>
+            <h4 style={{ fontSize: '1.2rem', marginBottom: 8 }}>Nearby Restaurants</h4>
+            <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: 12 }}>
                 Showing restaurants near: {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
             </p>
 
@@ -79,43 +78,39 @@ export const NearbyRestaurants = () => {
                 </div>
             )}
 
-            <div className="row">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {restaurants.map((restaurant) => (
-                    <div key={restaurant.id} className="col-md-6 col-lg-4 mb-3">
-                        <div className="card">
-                            {restaurant.image_url && (
+                    <div key={restaurant.id} style={{ display: 'flex', alignItems: 'center', background: '#f8f9fa', borderRadius: 8, padding: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+                        {/* Restaurant icon/image */}
+                        <div style={{ flex: '0 0 48px', width: 48, height: 48, borderRadius: '50%', overflow: 'hidden', background: '#e9ecef', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                            {restaurant.image_url ? (
                                 <img
                                     src={restaurant.image_url}
-                                    className="card-img-top"
                                     alt={restaurant.name}
-                                    style={{ height: '200px', objectFit: 'cover' }}
+                                    style={{ width: 48, height: 48, objectFit: 'cover' }}
                                 />
+                            ) : (
+                                <span role="img" aria-label="restaurant" style={{ fontSize: 24, color: '#adb5bd' }}>🍽️</span>
                             )}
-                            <div className="card-body">
-                                <h5 className="card-title">{restaurant.name}</h5>
-                                <p className="card-text">
-                                    <small className="text-muted">
-                                        {restaurant.categories?.map(cat => cat.title).join(', ')}
-                                    </small>
-                                </p>
-                                <p className="card-text">
-                                    <span className="badge bg-primary me-2">
-                                        ⭐ {restaurant.rating}
-                                    </span>
-                                    <small className="text-muted">
-                                        {(restaurant.distance / 1000).toFixed(1)}km away
-                                    </small>
-                                </p>
-                                <p className="card-text">
-                                    <small>{restaurant.location?.display_address?.join(', ')}</small>
-                                </p>
-                                {restaurant.phone && (
-                                    <a href={`tel:${restaurant.phone}`} className="btn btn-outline-primary btn-sm">
-                                        Call
-                                    </a>
-                                )}
+                        </div>
+                        {/* Info */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 500, fontSize: '1rem', lineHeight: 1.2 }}>{restaurant.name}</div>
+                            <div style={{ fontSize: '0.9rem', color: '#6c757d', marginBottom: 2 }}>
+                                {restaurant.categories?.map(cat => cat.title).join(', ')}
+                            </div>
+                            <div style={{ fontSize: '0.9rem', color: '#495057' }}>
+                                <span style={{ marginRight: 8 }}>⭐ {restaurant.rating}</span>
+                                <span style={{ marginRight: 8 }}>{(restaurant.distance / 1000).toFixed(1)} km</span>
+                                <span>{restaurant.location?.display_address?.join(', ')}</span>
                             </div>
                         </div>
+                        {/* Call button */}
+                        {restaurant.phone && (
+                            <a href={`tel:${restaurant.phone}`} className="btn btn-outline-primary btn-sm" style={{ marginLeft: 8, whiteSpace: 'nowrap' }}>
+                                Call
+                            </a>
+                        )}
                     </div>
                 ))}
             </div>

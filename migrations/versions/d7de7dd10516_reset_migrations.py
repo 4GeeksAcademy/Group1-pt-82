@@ -1,8 +1,8 @@
-"""Add favorite_pet to User
+"""Reset migrations
 
-Revision ID: 9568906c225b
-Revises: 6e00a28f73ef
-Create Date: 2025-09-29 23:56:21.806036
+Revision ID: d7de7dd10516
+Revises: 
+Create Date: 2025-10-01 22:20:02.736577
 
 """
 from alembic import op
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '9568906c225b'
-down_revision = '6e00a28f73ef'
+revision = 'd7de7dd10516'
+down_revision = None
 branch_labels = None
 depends_on = None
 

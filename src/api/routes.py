@@ -404,7 +404,8 @@ def get_nearby_restaurants():
         'longitude': longitude,
         'radius': radius,
         'categories': 'restaurants',
-        'limit': 6,
+        'limit': 3,
+        'offset': 1,
         'sort_by': 'distance'
     }
     try:
