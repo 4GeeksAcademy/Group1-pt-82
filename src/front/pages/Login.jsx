@@ -3,7 +3,7 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import useGlobalReducer from "../hooks/useGlobalReducer";
 
 async function apiLogin({ email, password }) {
-  const res = await fetch("https://probable-memory-q76jw5rqjpqrcxx5q-3001.app.github.dev/api/login", {
+  const res = await fetch("https://zany-acorn-q74w9qr697542x794-3001.app.github.dev/api/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password })

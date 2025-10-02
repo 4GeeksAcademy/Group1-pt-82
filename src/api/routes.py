@@ -11,6 +11,7 @@ from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
 from sqlalchemy import select
 from icalendar import Calendar
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from api.models import db, User, Listing, Booking
 
@@ -26,25 +27,26 @@ CORS(api, supports_credentials=True, origins="*")
 def create_token():
     email = request.json.get("email")
     password = request.json.get("password")
-    user = User.query.filter_by(email=email, password=password).first()
-    if user is None:
-        return jsonify({"msg": "Bad email or password"}), 401
-    access_token = create_access_token(identity=str(user.id))
-    return jsonify({"token": access_token, "user_id": user.id})
+    user = User.query.filter_by(email=email).first()
+    if user and check_password_hash(user.password, password):
+        access_token = create_access_token(identity=str(user.id))
+        return jsonify({"token": access_token, "user_id": user.id})
+    return jsonify({"msg": "Bad email or password"}), 401
+
 
 @api.route("/signup", methods=["POST"])
 def signup():
     email = request.json.get("email")
     password = request.json.get("password")
-    favorite_pet = request.json.get("pet")
+    favorite_pet = request.json.get("favorite_pet")
 
     existing_user = User.query.filter_by(email=email).first()
     if existing_user is not None:
         return jsonify({"msg": "User already exists"}), 409
 
     new_user = User(email=email, password=password,
-  
-                 favorite_pet=favorite_pet, is_active=True)
+
+                    favorite_pet=favorite_pet, is_active=True)
 
     db.session.add(new_user)
     db.session.commit()
@@ -55,12 +57,11 @@ def signup():
 def login():
     email = request.json.get("email")
     password = request.json.get("password")
-    user = User.query.filter_by(email=email, password=password).first()
-    if user is None:
-        return jsonify({"msg": "Bad email or password"}), 401
-    access_token = create_access_token(identity=str(user.id))
-    return jsonify({"token": access_token, "user": user.serialize()})
-
+    user = User.query.filter_by(email=email).first()
+    if user and check_password_hash(user.password, password):
+        access_token = create_access_token(identity=str(user.id))
+        return jsonify({"token": access_token, "user": user.serialize()})
+    return jsonify({"msg": "Bad email or password"}), 401
 
 
 @api.route("/account", methods=["GET"])
@@ -455,11 +456,13 @@ def get_current_weather():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 @api.route('/forgot-password', methods=['POST'])
 def forgot_password():
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
     favorite_pet = (data.get("favorite_pet") or "").strip()
+    new_password = data.get("new_password")
 
     if not email or not favorite_pet:
         return jsonify({"error": "email_and_favorite_pet_required"}), 400
@@ -468,5 +471,11 @@ def forgot_password():
     if not user:
         return jsonify({"error": "user_not_found_or_wrong_answer"}), 404
 
-    return jsonify({"ok": True}), 200
+    # If new_password is provided, update it
+    if new_password:
+        user.password = generate_password_hash(new_password)
+        db.session.commit()
+        return jsonify({"ok": True, "msg": "Password updated"}), 200
 
+    # If no new_password, just verification step
+    return jsonify({"ok": True}), 200
