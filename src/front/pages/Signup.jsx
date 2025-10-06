@@ -16,7 +16,7 @@ export const Signup = () => {
     setBusy(true);
 
     try {
-      const response = await fetch("https://probable-memory-q76jw5rqjpqrcxx5q-3001.app.github.dev/api/signup", {
+      const response = await fetch("https://zany-acorn-q74w9qr697542x794-3001.app.github.dev/api/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

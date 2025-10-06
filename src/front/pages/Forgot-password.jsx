@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom"; // <-- add useNavigate
 
-const API_BASE_URL = "https://probable-memory-q76jw5rqjpqrcxx5q-3001.app.github.dev/forgot-password";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const ForgotPassword = () => {
     const [email, setEmail] = useState("");
@@ -18,6 +18,8 @@ export const ForgotPassword = () => {
     const [message, setMessage] = useState("");      // success / info
     const [error, setError] = useState("");          // errors for either step
 
+    const navigate = useNavigate(); // <-- add this line
+
     // Step 1: verify email + favorite pet
     const handleVerify = async (e) => {
         e.preventDefault();
@@ -26,7 +28,7 @@ export const ForgotPassword = () => {
         setBusy(true);
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/forgot-password`, {
+            const res = await fetch(`${API_BASE_URL}/forgot-password`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -67,19 +69,20 @@ export const ForgotPassword = () => {
 
         setUpdating(true);
         try {
-            // Adjust endpoint/body as needed for your backend
-            const res = await fetch(`${API_BASE_URL}/api/reset-password`, {
+            // Include favorite_pet in the request body
+            const res = await fetch(`${API_BASE_URL}/forgot-password`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     email: email.trim(),
+                    favorite_pet: favoritePet.trim(),
                     new_password: newPassword,
                 }),
             });
 
             if (res.ok) {
-                setMessage("Your password has been updated successfully. You can now sign in.");
-                // Optionally clear fields
+                setMessage("Your password has been updated successfully. Redirecting to sign in...");
+                setTimeout(() => navigate("/login"), 1500); // <-- redirect after 1.5s
                 setNewPassword("");
                 setConfirmPassword("");
             } else {
@@ -193,11 +196,6 @@ export const ForgotPassword = () => {
                                         <button type="submit" className="btn btn-success" disabled={updating}>
                                             {updating ? "Updating..." : "Update Password"}
                                         </button>
-                                    </div>
-
-                                    {/* Link back to sign-in below the second box */}
-                                    <div className="text-center mt-3">
-                                        <Link to="/login">Return to sign-in page</Link>
                                     </div>
                                 </form>
                             )}
