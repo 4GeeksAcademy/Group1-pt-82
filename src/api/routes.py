@@ -34,7 +34,6 @@ def create_token():
     return jsonify({"msg": "Bad email or password"}), 401
 
 
-
 @api.route("/signup", methods=["POST"])
 def signup():
     email = request.json.get("email")
@@ -45,8 +44,8 @@ def signup():
     if existing_user is not None:
         return jsonify({"msg": "User already exists"}), 409
 
-    new_user = User(email=email, password=password,
-
+    hashed_password = generate_password_hash(password)
+    new_user = User(email=email, password=hashed_password,
                     favorite_pet=favorite_pet, is_active=True)
 
     db.session.add(new_user)
@@ -63,6 +62,7 @@ def login():
         access_token = create_access_token(identity=str(user.id))
         return jsonify({"token": access_token, "user": user.serialize()})
     return jsonify({"msg": "Bad email or password"}), 401
+
 
 @api.route("/account", methods=["GET"])
 @jwt_required()
@@ -477,4 +477,11 @@ def forgot_password():
     if not user:
         return jsonify({"error": "user_not_found_or_wrong_answer"}), 404
 
+    # If new_password is provided, update the password
+    if new_password:
+        user.password = generate_password_hash(new_password)
+        db.session.commit()
+        return jsonify({"ok": True, "msg": "Password updated"}), 200
+
+    # If no new_password, just verification step
     return jsonify({"ok": True}), 200
