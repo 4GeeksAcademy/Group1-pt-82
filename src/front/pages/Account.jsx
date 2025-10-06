@@ -203,42 +203,15 @@ export const Account = () => {
     // Lock outer page scroll; only the list scrolls
     <div
       className="bg-light"
-      style={{ position: "fixed", inset: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}
+      style={{ minHeight: "100vh" }}
     >
       <main className="container py-4 d-flex flex-column" style={{ flex: 1, minHeight: 0 }}>
-        {/* Top-right logo */}
-        <div className="d-flex justify-content-end align-items-center" style={{ marginBottom: "8px" }}>
-          <span className="navbar-brand mb-0 h1">
-            WhiteGlove <span className="text-primary">BnB</span>
-          </span>
-        </div>
-        {/* Logout button below logo with less vertical space */}
-        <div className="d-flex justify-content-end" style={{ marginBottom: "16px" }}>
-          <button
-            className="btn"
-            style={{
-              backgroundColor: "#007bff",
-              color: "#fff",
-              fontWeight: "bold",
-              minWidth: 120,
-              paddingTop: "6px",
-              paddingBottom: "6px",
-            }}
-            type="button"
-            onClick={handleLogout}
-          >
-            Logout
-          </button>
-        </div>
-
         <h1 className="h4 mb-3">Welcome {email}</h1>
-
         <div className="d-flex align-items-center justify-content-between">
           <h2 className="h5 mb-0">Here are your upcoming reservations...</h2>
           {loading && <span className="text-muted small">Loading…</span>}
           {err && <span className="text-danger small">Error: {err}</span>}
         </div>
-
         {/* Scrollable list — with top gap + scroll padding to prevent overlap */}
         <div
           ref={listRef}

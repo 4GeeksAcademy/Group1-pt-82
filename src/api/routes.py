@@ -32,6 +32,7 @@ def create_token():
     access_token = create_access_token(identity=str(user.id))
     return jsonify({"token": access_token, "user_id": user.id})
 
+
 @api.route("/signup", methods=["POST"])
 def signup():
     email = request.json.get("email")
@@ -43,8 +44,8 @@ def signup():
         return jsonify({"msg": "User already exists"}), 409
 
     new_user = User(email=email, password=password,
-  
-                 favorite_pet=favorite_pet, is_active=True)
+
+                    favorite_pet=favorite_pet, is_active=True)
 
     db.session.add(new_user)
     db.session.commit()
@@ -60,7 +61,6 @@ def login():
         return jsonify({"msg": "Bad email or password"}), 401
     access_token = create_access_token(identity=str(user.id))
     return jsonify({"token": access_token, "user": user.serialize()})
-
 
 
 @api.route("/account", methods=["GET"])
@@ -405,7 +405,7 @@ def get_nearby_restaurants():
         'radius': radius,
         'categories': 'restaurants',
         'limit': 3,
-        'offset': 1,
+        'offset': 2,
         'sort_by': 'distance'
     }
     try:
@@ -450,11 +450,17 @@ def get_current_weather():
             data = response.json()
             # Compose a simple weather string for the frontend
             weather_str = f"{data['current']['temp_f']}°F, {data['current']['condition']['text']}"
-            return jsonify({"weather": weather_str, "icon": data['current']['condition']['icon']}), 200
+            return jsonify({
+                "weather": weather_str,
+                "icon": data['current']['condition']['icon'],
+                "code": data['current']['condition']['code'],
+                "is_day": data['current']['is_day']
+            }), 200
         else:
             return jsonify({"error": "Failed to fetch weather data"}), response.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @api.route('/forgot-password', methods=['POST'])
 def forgot_password():
@@ -470,4 +476,3 @@ def forgot_password():
         return jsonify({"error": "user_not_found_or_wrong_answer"}), 404
 
     return jsonify({"ok": True}), 200
-
