@@ -34,6 +34,7 @@ def create_token():
     return jsonify({"msg": "Bad email or password"}), 401
 
 
+
 @api.route("/signup", methods=["POST"])
 def signup():
     email = request.json.get("email")
@@ -62,7 +63,6 @@ def login():
         access_token = create_access_token(identity=str(user.id))
         return jsonify({"token": access_token, "user": user.serialize()})
     return jsonify({"msg": "Bad email or password"}), 401
-
 
 @api.route("/account", methods=["GET"])
 @jwt_required()
@@ -405,7 +405,8 @@ def get_nearby_restaurants():
         'longitude': longitude,
         'radius': radius,
         'categories': 'restaurants',
-        'limit': 6,
+        'limit': 3,
+        'offset': 2,
         'sort_by': 'distance'
     }
     try:
@@ -450,7 +451,12 @@ def get_current_weather():
             data = response.json()
             # Compose a simple weather string for the frontend
             weather_str = f"{data['current']['temp_f']}°F, {data['current']['condition']['text']}"
-            return jsonify({"weather": weather_str, "icon": data['current']['condition']['icon']}), 200
+            return jsonify({
+                "weather": weather_str,
+                "icon": data['current']['condition']['icon'],
+                "code": data['current']['condition']['code'],
+                "is_day": data['current']['is_day']
+            }), 200
         else:
             return jsonify({"error": "Failed to fetch weather data"}), response.status_code
     except Exception as e:
@@ -471,11 +477,4 @@ def forgot_password():
     if not user:
         return jsonify({"error": "user_not_found_or_wrong_answer"}), 404
 
-    # If new_password is provided, update it
-    if new_password:
-        user.password = generate_password_hash(new_password)
-        db.session.commit()
-        return jsonify({"ok": True, "msg": "Password updated"}), 200
-
-    # If no new_password, just verification step
     return jsonify({"ok": True}), 200

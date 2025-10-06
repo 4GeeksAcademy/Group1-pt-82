@@ -4,6 +4,7 @@ import { NearbyRestaurants } from "../components/NearbyRestaurants";
 import { Weather } from "../components/Weather";
 import { useGeoLocation } from "../hooks/GeoLocation";
 import useGlobalReducer from "../hooks/useGlobalReducer";
+import './Preview.css'
 
 export const Preview = () => {
     const location = useLocation();
